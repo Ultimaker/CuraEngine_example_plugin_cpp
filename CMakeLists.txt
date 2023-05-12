@@ -36,5 +36,5 @@ target_include_directories(simplify_boost_plugin
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
         )
 
-target_link_libraries(simplify_boost_plugin PUBLIC protobuf::libprotobuf grpc::grpc asio-grpc::asio-grpc boost::boost spdlog::spdlog docopt_s asio-grpc-plugin-protos )
+target_link_libraries(simplify_boost_plugin PUBLIC asio-grpc::asio-grpc boost::boost spdlog::spdlog docopt_s asio-grpc-plugin-protos )
 

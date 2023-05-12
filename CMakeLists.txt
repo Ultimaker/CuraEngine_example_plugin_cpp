@@ -21,7 +21,7 @@ function(asio_grpc_add_proto_target _asio_grpc_name)
 
     target_sources(${_asio_grpc_name} PRIVATE ${ASIO_GRPC_PLUGIN_PROTO_SOURCES})
 
-    target_link_libraries(${_asio_grpc_name} PUBLIC protobuf::libprotobuf asio-grpc-compile-options-cpp20)
+    target_link_libraries(${_asio_grpc_name} PUBLIC protobuf::libprotobuf asio-grpc::asio-grpc asio-grpc-compile-options-cpp20)
 
     target_include_directories(${_asio_grpc_name} SYSTEM
             PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>")

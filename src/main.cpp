@@ -27,6 +27,7 @@
 #include <optional>
 #include <thread>
 
+#include "plugin.pb.h"
 #include "plugin/cmdline.h" // Custom command line argument definitions
 #include "simplify/simplify.h" // Custom utilities for simplifying code
 
@@ -47,7 +48,8 @@ int main(int argc, const char** argv)
     grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{builder.AddCompletionQueue()};
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
-    helloworld::Greeter::AsyncService service;
+
+    cura::plugins::proto::Plugin::AsyncService service;
     builder.RegisterService(&service);
     server = builder.BuildAndStart();
 
@@ -56,12 +58,13 @@ int main(int argc, const char** argv)
         [&]() -> asio::awaitable<void>
         {
             grpc::ServerContext server_context;
-            helloworld::HelloRequest request;
-            grpc::ServerAsyncResponseWriter<helloworld::HelloReply> writer{&server_context};
-            co_await agrpc::request(&helloworld::Greeter::AsyncService::RequestSayHello, service, server_context,
+            cura::plugins::proto::PluginRequest request;
+            grpc::ServerAsyncResponseWriter<cura::plugins::proto::PluginResponse> writer{&server_context};
+            co_await agrpc::request(&cura::plugins::proto::Plugin::AsyncService::RequestIdentify, service, server_context,
                                     request, writer, asio::use_awaitable);
-            helloworld::HelloReply response;
-            response.set_message("Hello " + request.name());
+            cura::plugins::proto::PluginResponse response;
+            response.set_version("0.0.1");
+            response.set_plugin_hash("qwerty-azerty-temp-hash");
             co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
         },
         asio::detached);

@@ -1,38 +1,81 @@
-// Copyright 2015 gRPC authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "io.grpc.examples.helloworld";
-option java_outer_classname = "HelloWorldProto";
-option objc_class_prefix = "HLW";
+package cura.plugins.proto;
 
-package helloworld;
+// TODO: Move proto defintions to a separate repo
+// TODO: Add error propagation
+// TODO: Add progress reporting
+// TODO: Add priority queueing (if multiple plugins are hooked up to the slot)
 
-// The greeting service definition.
-service Greeter {
-  // Sends a greeting
-  rpc SayHello(HelloRequest) returns (HelloReply) {}
+
+// These are the different slots that plugins can hook into
+enum SlotID {
+  UNKNOWN = 0;
+  SIMPLIFY = 1;
+  POSTPROCESS = 2;
 }
 
-// The request message containing the user's name.
-message HelloRequest {
-  string name = 1;
+// ---------------------------------------------------------------------
+// This is the message which is sent to the plugin to request identification
+service Plugin {
+  rpc Identify(PluginRequest) returns (PluginResponse) {}
 }
 
-// The response message containing the greetings
-message HelloReply {
-  string message = 1;
+message PluginRequest {
+  SlotID id = 1;
+}
+
+// This is the message which is sent back to CuraEngine to identify and validate the plugin
+message PluginResponse {
+  string plugin_hash = 1;
+  string version = 2;
+}
+
+// ---------------------------------------------------------------------
+// Some basic types that are used in the messages below
+message Point_2d {
+  sint64 x = 1;
+  sint64 y = 2;
+}
+
+message Polygon {
+  repeated Point_2d path = 1;
+}
+
+message Polygons {
+  repeated Polygon paths = 1;
+}
+
+// ---------------------------------------------------------------------
+// The SIMPLIFY slot request message
+
+service Simplify {
+  rpc Simplify(SimplifyRequest) returns (SimplifyResponse) {}
+}
+
+message SimplifyRequest {
+  Polygons polygons = 1;
+  uint64 max_deviation = 2;
+  uint64 max_angle = 3;
+}
+
+// The SIMPLIFY slot response message
+message SimplifyResponse {
+  Polygons polygons = 1;
+}
+
+// ---------------------------------------------------------------------
+// The POSTPROCESS slot request message
+
+service Postprocess {
+  rpc Postprocess(PostprocessRequest) returns (PostprocessResponse) {}
+}
+
+message PostprocessRequest {
+  string gcode_word = 1;
+}
+
+// The POSTPROCESS slot response message
+message PostprocessResponse {
+  string gcode_word = 1;
 }

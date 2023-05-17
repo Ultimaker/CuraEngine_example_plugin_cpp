@@ -7,6 +7,7 @@ from conan.tools.scm import Version
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.env import VirtualBuildEnv
 import os
+from pathlib import Path
 
 
 required_conan_version = ">=1.53.0"
@@ -74,6 +75,7 @@ class SimplifyBoostPluginConan(ConanFile):
         self.requires("boost/1.81.0")
         self.requires("spdlog/1.11.0")
         self.requires("docopt.cpp/0.6.3")
+        self.requires("curaengine_grpc_definitions/(latest)@ultimaker/testing")
 
     def validate(self):
         # validate the minimum cpp standard supported. For C++ projects only
@@ -99,6 +101,8 @@ class SimplifyBoostPluginConan(ConanFile):
         if is_msvc(self):
             tc.variables["USE_MSVC_RUNTIME_LIBRARY_DLL"] = not is_msvc_static_runtime(self)
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
+        cpp_info = self.dependencies["curaengine_grpc_definitions"].cpp_info
+        tc.variables["GRPC_PROTOS"] = ";".join([str(p) for p in Path(cpp_info.resdirs[0]).glob("*.proto")])
         tc.generate()
 
         tc = CMakeDeps(self)

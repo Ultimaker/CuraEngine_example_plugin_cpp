@@ -18,16 +18,18 @@
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <docopt/docopt.h> // Library for parsing command line arguments
+#include <fmt/format.h> // Formatting library
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
-#include <docopt/docopt.h> // Library for parsing command line arguments
 #include <spdlog/spdlog.h> // Logging library
-#include <fmt/format.h> // Formatting library
 
 #include <optional>
 #include <thread>
 
-#include "plugin.pb.h"
+#include "plugin.grpc.pb.h"
+#include "simplify.grpc.pb.h"
+
 #include "plugin/cmdline.h" // Custom command line argument definitions
 #include "simplify/simplify.h" // Custom utilities for simplifying code
 
@@ -43,15 +45,18 @@ int main(int argc, const char** argv)
     constexpr bool show_help = true;
     const std::map<std::string, docopt::value> args = docopt::docopt(fmt::format(plugin::cmdline::USAGE, plugin::cmdline::NAME), { argv + 1, argv + argc }, show_help, plugin::cmdline::VERSION_ID);
 
-    std::unique_ptr<grpc::Server> server;
+    //    std::unique_ptr<grpc::Server> plugin_server;
+    //    std::unique_ptr<grpc::Server> simplify_server;
 
     grpc::ServerBuilder builder;
-    agrpc::GrpcContext grpc_context{builder.AddCompletionQueue()};
+    agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
 
-    cura::plugins::proto::Plugin::AsyncService service;
-    builder.RegisterService(&service);
-    server = builder.BuildAndStart();
+    cura::plugins::proto::Plugin::AsyncService plugin_service;
+    cura::plugins::proto::Simplify::AsyncService simplify_service;
+    builder.RegisterService(&plugin_service);
+    builder.RegisterService(&simplify_service);
+    auto server = builder.BuildAndStart();
 
     asio::co_spawn(
         grpc_context,
@@ -59,9 +64,8 @@ int main(int argc, const char** argv)
         {
             grpc::ServerContext server_context;
             cura::plugins::proto::PluginRequest request;
-            grpc::ServerAsyncResponseWriter<cura::plugins::proto::PluginResponse> writer{&server_context};
-            co_await agrpc::request(&cura::plugins::proto::Plugin::AsyncService::RequestIdentify, service, server_context,
-                                    request, writer, asio::use_awaitable);
+            grpc::ServerAsyncResponseWriter<cura::plugins::proto::PluginResponse> writer{ &server_context };
+            co_await agrpc::request(&cura::plugins::proto::Plugin::AsyncService::RequestIdentify, plugin_service, server_context, request, writer, asio::use_awaitable);
             cura::plugins::proto::PluginResponse response;
             response.set_version("0.0.1");
             response.set_plugin_hash("qwerty-azerty-temp-hash");
@@ -69,6 +73,21 @@ int main(int argc, const char** argv)
         },
         asio::detached);
 
+    asio::co_spawn(
+        grpc_context,
+        [&]() -> asio::awaitable<void>
+        {
+            grpc::ServerContext server_context;
+            cura::plugins::proto::SimplifyRequest request;
+            grpc::ServerAsyncResponseWriter<cura::plugins::proto::SimplifyResponse> writer{ &server_context };
+            co_await agrpc::request(&cura::plugins::proto::Simplify::AsyncService::RequestSimplify, simplify_service, server_context, request, writer, asio::use_awaitable);
+            cura::plugins::proto::SimplifyResponse response;
+            auto poly = response.mutable_polygons();
+            poly->CopyFrom(request.polygons());
+            co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
+            spdlog::info("Received message: {}", request.DebugString());
+        },
+        asio::detached);
     grpc_context.run();
 
     server->Shutdown();

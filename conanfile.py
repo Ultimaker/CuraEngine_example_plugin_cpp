@@ -75,6 +75,8 @@ class SimplifyBoostPluginConan(ConanFile):
         self.requires("boost/1.81.0")
         self.requires("spdlog/1.11.0")
         self.requires("docopt.cpp/0.6.3")
+        self.requires("range-v3/0.12.0")
+        self.requires("clipper/6.4.2")
         self.requires("curaengine_grpc_definitions/(latest)@ultimaker/testing")
 
     def validate(self):

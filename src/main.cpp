@@ -45,6 +45,11 @@ int main(int argc, const char** argv)
     constexpr bool show_help = true;
     const std::map<std::string, docopt::value> args = docopt::docopt(fmt::format(plugin::cmdline::USAGE, plugin::cmdline::NAME), { argv + 1, argv + argc }, show_help, plugin::cmdline::VERSION_ID);
 
+//    auto poly = geometry::polygon{ { 0, 0 }, { 1, 1 }, { 2, 2 }, { 3, 3 } };
+//
+//    auto simpl = Simplify(100, 100, 100);
+//    auto x = simpl.simplify(poly);
+
     //    std::unique_ptr<grpc::Server> plugin_server;
     //    std::unique_ptr<grpc::Server> simplify_server;
 
@@ -62,14 +67,17 @@ int main(int argc, const char** argv)
         grpc_context,
         [&]() -> asio::awaitable<void>
         {
-            grpc::ServerContext server_context;
-            cura::plugins::proto::PluginRequest request;
-            grpc::ServerAsyncResponseWriter<cura::plugins::proto::PluginResponse> writer{ &server_context };
-            co_await agrpc::request(&cura::plugins::proto::Plugin::AsyncService::RequestIdentify, plugin_service, server_context, request, writer, asio::use_awaitable);
-            cura::plugins::proto::PluginResponse response;
-            response.set_version("0.0.1");
-            response.set_plugin_hash("qwerty-azerty-temp-hash");
-            co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
+            while (true)
+            {
+                grpc::ServerContext server_context;
+                cura::plugins::proto::PluginRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::proto::PluginResponse> writer{ &server_context };
+                co_await agrpc::request(&cura::plugins::proto::Plugin::AsyncService::RequestIdentify, plugin_service, server_context, request, writer, asio::use_awaitable);
+                cura::plugins::proto::PluginResponse response;
+                response.set_version("0.0.1");
+                response.set_plugin_hash("qwerty-azerty-temp-hash");
+                co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
+            }
         },
         asio::detached);
 
@@ -77,15 +85,36 @@ int main(int argc, const char** argv)
         grpc_context,
         [&]() -> asio::awaitable<void>
         {
-            grpc::ServerContext server_context;
-            cura::plugins::proto::SimplifyRequest request;
-            grpc::ServerAsyncResponseWriter<cura::plugins::proto::SimplifyResponse> writer{ &server_context };
-            co_await agrpc::request(&cura::plugins::proto::Simplify::AsyncService::RequestSimplify, simplify_service, server_context, request, writer, asio::use_awaitable);
-            cura::plugins::proto::SimplifyResponse response;
-            auto poly = response.mutable_polygons();
-            poly->CopyFrom(request.polygons());
-            co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
-            spdlog::info("Received message: {}", request.DebugString());
+            while (true)
+            {
+                grpc::ServerContext server_context;
+                cura::plugins::proto::SimplifyRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::proto::SimplifyResponse> writer{ &server_context };
+
+                co_await agrpc::request(&cura::plugins::proto::Simplify::AsyncService::RequestSimplify, simplify_service, server_context, request, writer, asio::use_awaitable);
+                cura::plugins::proto::SimplifyResponse response;
+
+                Simplify simpl(request.max_deviation(), request.max_resolution(), request.max_area_deviation());
+                auto simplified_polygons = response.mutable_polygons();
+                for (const auto& paths : request.polygons().paths())
+                {
+                    geometry::polygon poly{};
+                    for (const auto& point : paths.path())
+                    {
+                        poly.emplace_back(point.x(), point.y());
+                    }
+                    auto result = simpl.simplify(poly);
+                    auto simplified_poly = simplified_polygons->add_paths();
+                    for (const auto& point : result)
+                    {
+                        auto path = simplified_poly->add_path();
+                        path->set_x(point.X);
+                        path->set_y(point.Y);
+                    }
+                }
+                co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
+//                spdlog::info("Received message: {}", request.DebugString());
+            }
         },
         asio::detached);
     grpc_context.run();

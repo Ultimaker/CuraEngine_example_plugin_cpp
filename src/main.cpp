@@ -46,6 +46,7 @@ namespace asio = boost::asio;
 // end-snippet
 int main(int argc, const char** argv)
 {
+    spdlog::set_level(spdlog::level::debug);
     constexpr bool show_help = true;
     const std::map<std::string, docopt::value> args = docopt::docopt(fmt::format(plugin::cmdline::USAGE, plugin::cmdline::NAME), { argv + 1, argv + argc }, show_help, plugin::cmdline::VERSION_ID);
 
@@ -96,11 +97,11 @@ int main(int argc, const char** argv)
                 grpc::ServerAsyncResponseWriter<cura::plugins::proto::SimplifyResponse> writer{ &server_context };
 
                 co_await agrpc::request(&cura::plugins::proto::Simplify::AsyncService::RequestSimplify, simplify_service, server_context, request, writer, asio::use_awaitable);
+//                spdlog::debug("Request: {}", request.DebugString());
                 cura::plugins::proto::SimplifyResponse response;
 
                 Simplify simpl(request.max_deviation(), request.max_resolution(), request.max_area_deviation());
-                auto* simplified_polygons = response.mutable_polygons();
-                auto* simplified_polygon = simplified_polygons->add_polygons();
+                auto* rsp_polygons = response.mutable_polygons()->add_polygons();
 
                 for (const auto& polygon : request.polygons().polygons())
                 {
@@ -112,14 +113,15 @@ int main(int argc, const char** argv)
                     }
                     concepts::poly_range auto result_outline = simpl.simplify(outline_poly);
 
-                    auto* simplified_outline_path = simplified_polygon->mutable_outline()->add_path();
+                    auto* rsp_outline = rsp_polygons->mutable_outline();
                     for (const auto& point : result_outline)
                     {
-                        simplified_outline_path->set_x(point.X);
-                        simplified_outline_path->set_y(point.Y);
+                        auto* rsp_outline_path = rsp_outline->add_path();
+                        rsp_outline_path->set_x(point.X);
+                        rsp_outline_path->set_y(point.Y);
                     }
 
-                    auto* simplified_holes = simplified_polygon->mutable_holes();
+                    auto* rsp_holes = rsp_polygons->mutable_holes();
                     for (const auto& hole : polygon.holes())
                     {
                         geometry::polygon holes_poly{};
@@ -129,16 +131,17 @@ int main(int argc, const char** argv)
                         }
                         concepts::poly_range auto holes_result = simpl.simplify(holes_poly);
 
-                        auto* hole_path = simplified_holes->Add()->add_path();
+                        auto* rsp_hole = rsp_polygons->mutable_holes()->Add();
                         for (const auto& point : holes_result)
                         {
+                            auto* hole_path = rsp_hole->add_path();
                             hole_path->set_x(point.X);
                             hole_path->set_y(point.Y);
                         }
                     }
                 }
+//                spdlog::debug("Response: {}", request.DebugString());
                 co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
-//                spdlog::info("Received message: {}", request.DebugString());
             }
         },
         asio::detached);

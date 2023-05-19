@@ -22,6 +22,8 @@
 #include <fmt/format.h> // Formatting library
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
+#include <range/v3/view/concat.hpp>
+#include <range/v3/view/single.hpp>
 #include <spdlog/spdlog.h> // Logging library
 
 #include <optional>
@@ -35,6 +37,8 @@
 
 namespace asio = boost::asio;
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "cppcoreguidelines-avoid-capturing-lambda-coroutines"
 // begin-snippet: server-side-helloworld
 // ---------------------------------------------------
 // Server-side hello world which handles exactly one request from the client before shutting down.
@@ -95,21 +99,42 @@ int main(int argc, const char** argv)
                 cura::plugins::proto::SimplifyResponse response;
 
                 Simplify simpl(request.max_deviation(), request.max_resolution(), request.max_area_deviation());
-                auto simplified_polygons = response.mutable_polygons();
-                for (const auto& paths : request.polygons().paths())
+                auto* simplified_polygons = response.mutable_polygons();
+                auto* simplified_polygon = simplified_polygons->add_polygons();
+
+                for (const auto& polygon : request.polygons().polygons())
                 {
-                    geometry::polygon poly{};
-                    for (const auto& point : paths.path())
+                    const auto& outline = polygon.outline();
+                    geometry::polygon outline_poly{};
+                    for (const auto& point : outline.path())
                     {
-                        poly.emplace_back(point.x(), point.y());
+                        outline_poly.emplace_back(point.x(), point.y());
                     }
-                    auto result = simpl.simplify(poly);
-                    auto simplified_poly = simplified_polygons->add_paths();
-                    for (const auto& point : result)
+                    concepts::poly_range auto result_outline = simpl.simplify(outline_poly);
+
+                    auto* simplified_outline_path = simplified_polygon->mutable_outline()->add_path();
+                    for (const auto& point : result_outline)
                     {
-                        auto path = simplified_poly->add_path();
-                        path->set_x(point.X);
-                        path->set_y(point.Y);
+                        simplified_outline_path->set_x(point.X);
+                        simplified_outline_path->set_y(point.Y);
+                    }
+
+                    auto* simplified_holes = simplified_polygon->mutable_holes();
+                    for (const auto& hole : polygon.holes())
+                    {
+                        geometry::polygon holes_poly{};
+                        for (const auto& point : hole.path())
+                        {
+                            holes_poly.emplace_back(point.x(), point.y());
+                        }
+                        concepts::poly_range auto holes_result = simpl.simplify(holes_poly);
+
+                        auto* hole_path = simplified_holes->Add()->add_path();
+                        for (const auto& point : holes_result)
+                        {
+                            hole_path->set_x(point.X);
+                            hole_path->set_y(point.Y);
+                        }
                     }
                 }
                 co_await agrpc::finish(writer, response, grpc::Status::OK, asio::use_awaitable);
@@ -121,3 +146,4 @@ int main(int argc, const char** argv)
 
     server->Shutdown();
 }
+#pragma clang diagnostic pop

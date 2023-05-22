@@ -10,7 +10,7 @@ find_package(range-v3 REQUIRED)
 find_package(clipper REQUIRED)
 
 asio_grpc_protobuf_generate(
-        GENERATE_GRPC GENERATE_MOCK_CODE GENERATE_DESCRIPTORS
+        GENERATE_GRPC GENERATE_MOCK_CODE
         OUT_VAR "ASIO_GRPC_PLUGIN_PROTO_SOURCES"
         OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated"
         PROTOS "${GRPC_PROTOS}"

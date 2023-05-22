@@ -1,3 +1,6 @@
+#include <optional>
+#include <thread>
+
 #include <agrpc/asio_grpc.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
@@ -32,25 +35,28 @@ int main(int argc, const char** argv)
     constexpr bool show_help = true;
     const std::map<std::string, docopt::value> args = docopt::docopt(fmt::format(plugin::cmdline::USAGE, plugin::cmdline::NAME), { argv + 1, argv + argc }, show_help, plugin::cmdline::VERSION_ID);
 
+    std::unique_ptr<grpc::Server> server;
+
     grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
 
     cura::plugins::v1::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
-    auto server = builder.BuildAndStart();
+    server = builder.BuildAndStart();
 
     // Start the plugin main process
     boost::asio::co_spawn(
         grpc_context,
         [&]() -> boost::asio::awaitable<void>
         {
-            grpc::ServerContext server_context;
-            grpc::ServerAsyncResponseWriter<cura::plugins::v1::SimplifyServiceModifyResponse> writer{ &server_context };
             while (true)
             {
+                grpc::ServerContext server_context;
                 cura::plugins::v1::SimplifyServiceModifyRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::v1::SimplifyServiceModifyResponse> writer{ &server_context };
                 co_await agrpc::request(&cura::plugins::v1::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
+                spdlog::debug("Received message");
                 // spdlog::debug("Request: {}", request.DebugString());
                 cura::plugins::v1::SimplifyServiceModifyResponse response;
 

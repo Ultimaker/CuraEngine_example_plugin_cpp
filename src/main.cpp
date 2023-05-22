@@ -6,8 +6,6 @@
 #include <fmt/format.h> // Formatting library
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
-#include <range/v3/view/concat.hpp>
-#include <range/v3/view/single.hpp>
 #include <spdlog/spdlog.h> // Logging library
 
 #include "plugin/cmdline.h" // Custom command line argument definitions
@@ -15,17 +13,15 @@
 
 #include "simplify.grpc.pb.h"
 #include "simplify.pb.h"
-
-namespace asio = boost::asio;
-namespace proto = cura::plugins::proto;
+#include "slot_id.pb.h"
 
 
 struct plugin_metadata
 {
-    cura::plugins::proto::SlotID slot_id{ cura::plugins::proto::SlotID::SIMPLIFY };
+    cura::plugins::v1::SlotID slot_id{ cura::plugins::v1::SlotID::SIMPLIFY };
     std::string plugin_name{ "UltiMaker basic simplification" };
-    std::string slot_version{ "0.1.0-alpha.1+grpc_tests" };
-    std::string plugin_version{ "0.2.0-alpha.1+proto_tests" };
+    std::string slot_version{ "0.1.0-alpha.2" };
+    std::string plugin_version{ "0.2.0-alpha.2" };
 };
 
 static plugin_metadata metadata{};
@@ -40,31 +36,9 @@ int main(int argc, const char** argv)
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
 
-    proto::Simplify::AsyncService service;
+    cura::plugins::v1::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
     auto server = builder.BuildAndStart();
-
-    // Handshake with CuraEngine
-    boost::asio::co_spawn(
-        grpc_context,
-        [&]() -> boost::asio::awaitable<void>
-        {
-            grpc::ServerContext server_context;
-            grpc::ServerAsyncResponseWriter<proto::PluginResponse> writer{ &server_context };
-            while (true)
-            {
-                proto::PluginRequest request;
-                co_await agrpc::request(&proto::Simplify::AsyncService::RequestIdentify, service, server_context, request, writer, asio::use_awaitable);
-                spdlog::debug("Received an PluginRequest from CuraEngine {}", request.DebugString());
-                proto::PluginResponse response;
-                response.set_slot_id(metadata.slot_id);
-                response.set_plugin_name(metadata.plugin_name);
-                response.set_slot_version(metadata.slot_version);
-                response.set_plugin_version(metadata.plugin_version);
-                co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
-            }
-        },
-        boost::asio::detached);
 
     // Start the plugin main process
     boost::asio::co_spawn(
@@ -72,13 +46,13 @@ int main(int argc, const char** argv)
         [&]() -> boost::asio::awaitable<void>
         {
             grpc::ServerContext server_context;
-            grpc::ServerAsyncResponseWriter<proto::SimplifyResponse> writer{ &server_context };
+            grpc::ServerAsyncResponseWriter<cura::plugins::v1::SimplifyServiceModifyResponse> writer{ &server_context };
             while (true)
             {
-                proto::SimplifyRequest request;
-                co_await agrpc::request(&proto::Simplify::AsyncService::RequestSimplify, service, server_context, request, writer, boost::asio::use_awaitable);
+                cura::plugins::v1::SimplifyServiceModifyRequest request;
+                co_await agrpc::request(&cura::plugins::v1::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
                 // spdlog::debug("Request: {}", request.DebugString());
-                proto::SimplifyResponse response;
+                cura::plugins::v1::SimplifyServiceModifyResponse response;
 
                 Simplify simpl(request.max_deviation(), request.max_resolution(), request.max_area_deviation());
                 auto* rsp_polygons = response.mutable_polygons()->add_polygons();

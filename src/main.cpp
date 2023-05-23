@@ -17,8 +17,8 @@
 #include "plugin/cmdline.h" // Custom command line argument definitions
 #include "simplify/simplify.h" // Custom utilities for simplifying code
 
-#include "cura/plugins/slots/simplify/v1/simplify.grpc.pb.h"
-#include "cura/plugins/slots/simplify/v1/simplify.pb.h"
+#include "cura/plugins/slots/simplify/v0/simplify.grpc.pb.h"
+#include "cura/plugins/slots/simplify/v0/simplify.pb.h"
 
 
 struct plugin_metadata
@@ -43,7 +43,7 @@ int main(int argc, const char** argv)
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
 
-    cura::plugins::slots::simplify::v1::SimplifyService::AsyncService service;
+    cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
     server = builder.BuildAndStart();
 
@@ -59,10 +59,10 @@ int main(int argc, const char** argv)
                 server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
                 server_context.AddInitialMetadata("cura-plugin-version", metadata.plugin_version); // optional but recommended
 
-                cura::plugins::slots::simplify::v1::SimplifyServiceModifyRequest request;
-                grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v1::SimplifyServiceModifyResponse> writer{ &server_context };
-                co_await agrpc::request(&cura::plugins::slots::simplify::v1::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
-                cura::plugins::slots::simplify::v1::SimplifyServiceModifyResponse response;
+                cura::plugins::slots::simplify::v0::SimplifyServiceModifyRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse> writer{ &server_context };
+                co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
+                cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse response;
 
                 grpc::Status status = grpc::Status::OK;
                 try

@@ -51,12 +51,13 @@ int main(int argc, const char** argv)
     grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     const auto host_str = args.at("<address>").asString();
+    const auto port_str = args.at("<port>").asString();
     constexpr auto create_credentials =
         [&host_str]()
         {
             if (host_str == "localhost" || host_str == "127.0.0.1")
             {
-                spdlog::info("Credentials for local engine.");
+                spdlog::info("Connect to engine via local-host.");
                 return grpc::InsecureServerCredentials();
             }
 
@@ -70,10 +71,11 @@ int main(int argc, const char** argv)
                 creds_config.pem_key_cert_pairs = { key_pair };
                 creds_config.pem_root_certs = secrets::certificate;
             }
-            spdlog::info("Credentials for remote engine.");
+            spdlog::info("Credentials to connect remotely to an engine (at '{}').", host_str);
             return grpc::SslServerCredentials(creds_config);
         };
-    builder.AddListeningPort(fmt::format("{}:{}", host_str, args.at("<port>").asString()), create_credentials());
+    spdlog::info("Listening on port '{}'.", port_str);
+    builder.AddListeningPort(fmt::format("{}:{}", host_str, port_str), create_credentials());
 
     cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
     builder.RegisterService(&service);

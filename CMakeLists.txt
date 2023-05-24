@@ -6,6 +6,7 @@ find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(docopt REQUIRED)
 find_package(asio-grpc REQUIRED)
+find_package(grpc REQUIRED)
 find_package(range-v3 REQUIRED)
 find_package(clipper REQUIRED)
 
@@ -24,5 +25,5 @@ target_include_directories(simplify_boost_plugin
         ${CMAKE_CURRENT_BINARY_DIR}/generated
         )
 
-target_link_libraries(simplify_boost_plugin PUBLIC asio-grpc::asio-grpc protobuf::libprotobuf boost::boost spdlog::spdlog docopt_s clipper::clipper range-v3::range-v3)
+target_link_libraries(simplify_boost_plugin PUBLIC asio-grpc::asio-grpc grpc::grpc protobuf::libprotobuf boost::boost spdlog::spdlog docopt_s clipper::clipper range-v3::range-v3)
 

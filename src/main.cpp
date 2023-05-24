@@ -2,7 +2,6 @@
 #include <thread>
 #include <map>
 
-
 #include <agrpc/asio_grpc.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
@@ -10,6 +9,7 @@
 #include <docopt/docopt.h> // Library for parsing command line arguments
 #include <fmt/format.h> // Formatting library
 #include <fmt/ranges.h> // Formatting library for ranges
+#include <grpcpp/create_channel.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <spdlog/spdlog.h> // Logging library
@@ -20,6 +20,16 @@
 #include "cura/plugins/slots/simplify/v0/simplify.grpc.pb.h"
 #include "cura/plugins/slots/simplify/v0/simplify.pb.h"
 
+#define BUILD_ALLOW_REMOTE_CHANNELS 1
+#if BUILD_ALLOW_REMOTE_CHANNELS
+#include "../secrets/certificate.pem.h"
+#include "../secrets/private_key.pem.h"
+#endif
+
+namespace buildopt
+{
+    constexpr bool ALLOW_REMOTE_CHANNELS = (BUILD_ALLOW_REMOTE_CHANNELS)==1;
+} // namespace buildopt
 
 struct plugin_metadata
 {
@@ -29,7 +39,6 @@ struct plugin_metadata
 };
 
 static plugin_metadata metadata{};
-
 
 int main(int argc, const char** argv)
 {
@@ -41,7 +50,30 @@ int main(int argc, const char** argv)
 
     grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
-    builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
+    const auto host_str = args.at("<address>").asString();
+    constexpr auto create_credentials =
+        [&host_str]()
+        {
+            if (host_str == "localhost" || host_str == "127.0.0.1")
+            {
+                spdlog::info("Credentials for local engine.");
+                return grpc::InsecureServerCredentials();
+            }
+
+            auto creds_config = grpc::SslServerCredentialsOptions();
+            if (buildopt::ALLOW_REMOTE_CHANNELS)
+            {
+                // NOTE: In order to guarantee our users' security, remote plugins require a private key.
+                //       You can either compile the engine (and/or Cura) so that it work with your own key-pair, or...
+                //       ... if you want to run remote plugins against the precompiled Cura, please contact UltiMaker.
+                grpc::SslServerCredentialsOptions::PemKeyCertPair key_pair = { std::string(secrets::private_key), std::string(secrets::certificate) };
+                creds_config.pem_key_cert_pairs = { key_pair };
+                creds_config.pem_root_certs = secrets::certificate;
+            }
+            spdlog::info("Credentials for remote engine.");
+            return grpc::SslServerCredentials(creds_config);
+        };
+    builder.AddListeningPort(fmt::format("{}:{}", host_str, args.at("<port>").asString()), create_credentials());
 
     cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
@@ -52,8 +84,11 @@ int main(int argc, const char** argv)
         grpc_context,
         [&]() -> boost::asio::awaitable<void>
         {
+            spdlog::info("Started.");
             while (true)
             {
+                spdlog::info("Ready for next.");
+
                 grpc::ServerContext server_context;
                 server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version);  // IMPORTANT: This NEEDS to be set!
                 server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
@@ -62,6 +97,7 @@ int main(int argc, const char** argv)
                 cura::plugins::slots::simplify::v0::SimplifyServiceModifyRequest request;
                 grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse> writer{ &server_context };
                 co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
+                spdlog::info("Processing request.");
                 cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse response;
 
                 grpc::Status status = grpc::Status::OK;
@@ -73,7 +109,7 @@ int main(int argc, const char** argv)
                     for (const auto& polygon : request.polygons().polygons())
                     {
                         const auto& outline = polygon.outline();
-                        geometry::polygon outline_poly{};
+                        geometry::polygon outline_poly;
                         for (const auto& point : outline.path())
                         {
                             outline_poly.emplace_back(point.x(), point.y());

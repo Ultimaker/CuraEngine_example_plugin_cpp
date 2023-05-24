@@ -55,6 +55,9 @@ template<concepts::point P = Point, template<class> class Container = std::vecto
 polygon(std::initializer_list<P>)->polygon<P, direction::NA, Container>;
 
 template<concepts::point P = Point, template<class> class Container = std::vector>
+polygon() -> polygon<P, direction::NA, Container>;
+
+template<concepts::point P = Point, template<class> class Container = std::vector>
 struct polygon_outer : public point_container<P, true, direction::CW, Container>
 {
     constexpr polygon_outer() noexcept = default;

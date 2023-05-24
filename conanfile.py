@@ -70,6 +70,7 @@ class SimplifyBoostPluginConan(ConanFile):
 
     def requirements(self):
         self.requires("protobuf/3.21.9")
+        self.requires("grpc/1.50.1")
         self.requires("asio-grpc/2.4.0")
         self.requires("openssl/1.1.1l")
         self.requires("boost/1.81.0")
@@ -104,7 +105,7 @@ class SimplifyBoostPluginConan(ConanFile):
             tc.variables["USE_MSVC_RUNTIME_LIBRARY_DLL"] = not is_msvc_static_runtime(self)
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
         cpp_info = self.dependencies["curaengine_grpc_definitions"].cpp_info
-        tc.variables["GRPC_IMPORT_DIRS"] = cpp_info.resdirs[0]
+        tc.variables["GRPC_IMPORT_DIRS"] = cpp_info.resdirs[0].replace("\\", "/")
         tc.variables["GRPC_PROTOS"] = ";".join([str(p).replace("\\", "/") for p in Path(cpp_info.resdirs[0]).rglob("*.proto")])
         tc.generate()
 

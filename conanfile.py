@@ -10,15 +10,15 @@ import os
 from pathlib import Path
 
 
-required_conan_version = ">=1.53.0"
+required_conan_version = ">=1.56.0"
 
 
 class SimplifyBoostPluginConan(ConanFile):
-    name = "simplify_boost_plugin"
-    description = "CuraEngine plugin for Boost simplify"
+    name = "curaengine_simplify_plugin"
+    description = "CuraEngine plugin for simplify"
     license = "agpl-3.0"
-    url = "https://github.com/conan-io/conan-center-index"
-    homepage = "https://github.com/Ultimaker/SimplifyBoostPlugin"
+    url = "https://github.com/Ultimaker/CuraEngine_example_plugin_cpp"
+    homepage = "https://github.com/Ultimaker/CuraEngine_example_plugin_cpp"
     topics = ("protobuf", "asio", "plugin", "boost", "simplify")
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"

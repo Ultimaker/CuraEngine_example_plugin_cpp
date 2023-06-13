@@ -1,6 +1,6 @@
-#include <optional>
-#include <thread>
 #include <map>
+#include <string>
+#include <thread>
 
 
 #include <agrpc/asio_grpc.hpp>
@@ -19,6 +19,7 @@
 
 #include "cura/plugins/slots/simplify/v0/simplify.grpc.pb.h"
 #include "cura/plugins/slots/simplify/v0/simplify.pb.h"
+#include "cura/plugins/v0/broadcast_slots.pb.h"
 
 
 struct plugin_metadata
@@ -52,6 +53,23 @@ int main(int argc, const char** argv)
         grpc_context,
         [&]() -> boost::asio::awaitable<void>
         {
+            // Listen to the BroadcastSettingsRequest
+            grpc::ServerContext broadcast_server_context;
+            cura::plugins::v0::BroadcastServiceSettingsRequest request;
+            grpc::ServerAsyncResponseWriter<google::protobuf::Empty> writer{ &broadcast_server_context };
+            co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestBroadcastSettings, service, broadcast_server_context, request, writer, boost::asio::use_awaitable);
+            google::protobuf::Empty response;
+            co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
+
+            std::unordered_map<std::string, std::string> settings;
+            for (const auto& [key, value] : request.settings())
+            {
+                settings.emplace(key, value);
+                spdlog::info("Received setting: {} = {}", key, value);
+            }
+
+
+            // Listen to the ModifyRequest
             while (true)
             {
                 grpc::ServerContext server_context;

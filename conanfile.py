@@ -1,7 +1,7 @@
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.microsoft import check_min_vs, is_msvc_static_runtime, is_msvc
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, copy, rm, rmdir, replace_in_file
+from conan.tools.files import copy, rm, rmdir
 from conan.tools.build import check_min_cppstd
 from conan.tools.scm import Version
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
@@ -77,7 +77,7 @@ class SimplifyBoostPluginConan(ConanFile):
         self.requires("docopt.cpp/0.6.3")
         self.requires("range-v3/0.12.0")
         self.requires("clipper/6.4.2")
-        self.requires("curaengine_grpc_definitions/(latest)@ultimaker/testing")
+        self.requires("curaengine_grpc_definitions/(latest)@ultimaker/cura_10618")
 
     def validate(self):
         # validate the minimum cpp standard supported. For C++ projects only

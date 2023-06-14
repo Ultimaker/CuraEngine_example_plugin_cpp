@@ -46,29 +46,39 @@ int main(int argc, const char** argv)
 
     cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
+    grpc::AsyncGenericService generic_service;
+    builder.RegisterAsyncGenericService(&generic_service);
     server = builder.BuildAndStart();
+
+    std::unordered_map<std::string, std::string> settings;
+    boost::asio::co_spawn(
+        grpc_context,
+        [&]() -> boost::asio::awaitable<void>
+        {
+                // Listen to the BroadcastSettingsRequest
+                while (true)
+                {
+                    grpc::ServerContext broadcast_server_context;
+                    cura::plugins::v0::BroadcastServiceSettingsRequest request;
+                    grpc::ServerAsyncResponseWriter<google::protobuf::Empty> writer{ &broadcast_server_context };
+                    co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestBroadcastSettings, service, broadcast_server_context, request, writer, boost::asio::use_awaitable);
+                    google::protobuf::Empty response;
+                    co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
+
+                    for (const auto& [key, value] : request.settings())
+                    {
+                        settings.emplace(key, value);
+                        spdlog::info("Received setting: {} = {}", key, value);
+                    }
+                }
+        }, boost::asio::detached);
+
 
     // Start the plugin main process
     boost::asio::co_spawn(
         grpc_context,
         [&]() -> boost::asio::awaitable<void>
         {
-            // Listen to the BroadcastSettingsRequest
-            grpc::ServerContext broadcast_server_context;
-            cura::plugins::v0::BroadcastServiceSettingsRequest request;
-            grpc::ServerAsyncResponseWriter<google::protobuf::Empty> writer{ &broadcast_server_context };
-            co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestBroadcastSettings, service, broadcast_server_context, request, writer, boost::asio::use_awaitable);
-            google::protobuf::Empty response;
-            co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
-
-            std::unordered_map<std::string, std::string> settings;
-            for (const auto& [key, value] : request.settings())
-            {
-                settings.emplace(key, value);
-                spdlog::info("Received setting: {} = {}", key, value);
-            }
-
-
             // Listen to the ModifyRequest
             while (true)
             {

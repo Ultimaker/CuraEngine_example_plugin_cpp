@@ -1,7 +1,8 @@
+#include <cstddef>
 #include <map>
+#include <span>
 #include <string>
 #include <thread>
-
 
 #include <agrpc/asio_grpc.hpp>
 #include <boost/asio/co_spawn.hpp>
@@ -65,7 +66,7 @@ int main(int argc, const char** argv)
                     google::protobuf::Empty response;
                     co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
 
-                    for (const auto& [key, value] : request.settings())
+                    for (const auto& [key, value] : request.global_settings().settings())
                     {
                         settings.emplace(key, value);
                         spdlog::info("Received setting: {} = {}", key, value);

@@ -47,8 +47,6 @@ int main(int argc, const char** argv)
 
     cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
     builder.RegisterService(&service);
-    grpc::AsyncGenericService generic_service;
-    builder.RegisterAsyncGenericService(&generic_service);
     server = builder.BuildAndStart();
 
     std::unordered_map<std::string, std::string> settings;

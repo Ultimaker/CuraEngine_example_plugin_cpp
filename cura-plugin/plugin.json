@@ -1,0 +1,9 @@
+{
+  "name": "CuraEngine Simplify Plugin",
+  "author": "UltiMaker",
+  "version": "0.1.0",
+  "description": "CuraEngine plugin for simplification of the polygons and toolpaths.",
+  "api": 8,
+  "supported_sdk_versions": ["8.0.0"],
+  "i18n-catalog": "cura"
+}

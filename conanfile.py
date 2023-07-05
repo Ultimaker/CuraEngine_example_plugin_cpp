@@ -56,6 +56,8 @@ class SimplifyBoostPluginConan(ConanFile):
             del self.options.fPIC
 
     def configure(self):
+        self.options["boost"].header_only = True
+
         if self.options.shared:
             self.options.rm_safe("fPIC")
         self.options["grpc"].csharp_plugin = False

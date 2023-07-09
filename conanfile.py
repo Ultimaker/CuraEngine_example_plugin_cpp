@@ -13,9 +13,9 @@ from pathlib import Path
 required_conan_version = ">=1.53.0"
 
 
-class SimplifyBoostPluginConan(ConanFile):
-    name = "simplify_boost_plugin"
-    description = "CuraEngine plugin for Boost simplify"
+class CuraEngineSimplifyPluginConan(ConanFile):
+    name = "curaengine_simplify_plugin"
+    description = "CuraEngine plugin for simplify"
     license = "agpl-3.0"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/Ultimaker/SimplifyBoostPlugin"

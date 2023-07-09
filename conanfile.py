@@ -79,7 +79,7 @@ class SimplifyBoostPluginConan(ConanFile):
         self.requires("docopt.cpp/0.6.3")
         self.requires("range-v3/0.12.0")
         self.requires("clipper/6.4.2")
-        self.requires("curaengine_grpc_definitions/(latest)@ultimaker/testing")
+        self.requires("curaengine_grpc_definitions/latest@ultimaker/cura_10714")
 
     def validate(self):
         # validate the minimum cpp standard supported. For C++ projects only

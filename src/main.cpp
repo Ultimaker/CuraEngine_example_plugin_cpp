@@ -1,6 +1,6 @@
+#include <map>
 #include <optional>
 #include <thread>
-#include <map>
 
 
 #include <agrpc/asio_grpc.hpp>
@@ -17,6 +17,8 @@
 #include "plugin/cmdline.h" // Custom command line argument definitions
 #include "simplify/simplify.h" // Custom utilities for simplifying code
 
+#include "cura/plugins/slots/handshake/v0/handshake.grpc.pb.h"
+#include "cura/plugins/slots/handshake/v0/handshake.pb.h"
 #include "cura/plugins/slots/simplify/v0/simplify.grpc.pb.h"
 #include "cura/plugins/slots/simplify/v0/simplify.pb.h"
 
@@ -25,7 +27,7 @@ struct plugin_metadata
 {
     std::string plugin_name{ "UltiMaker basic simplification" };
     std::string slot_version{ "0.1.0-alpha.3" };
-    std::string plugin_version{ "0.2.0-alpha.3" };
+    std::string plugin_version{ "0.3.0-alpha.1" };
 };
 
 static plugin_metadata metadata{};
@@ -43,11 +45,15 @@ int main(int argc, const char** argv)
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
     builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
 
-    cura::plugins::slots::simplify::v0::SimplifyService::AsyncService service;
+    cura::plugins::slots::handshake::v0::HandshakeService::AsyncService handshake_service;
+    builder.RegisterService(&handshake_service);
+
+    cura::plugins::slots::simplify::v0::SimplifyModifyService::AsyncService service;
     builder.RegisterService(&service);
+
     server = builder.BuildAndStart();
 
-    // Start the plugin main process
+    // Start the handshake process
     boost::asio::co_spawn(
         grpc_context,
         [&]() -> boost::asio::awaitable<void>
@@ -55,14 +61,39 @@ int main(int argc, const char** argv)
             while (true)
             {
                 grpc::ServerContext server_context;
-                server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version);  // IMPORTANT: This NEEDS to be set!
+                server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version); // IMPORTANT: This NEEDS to be set!
                 server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
                 server_context.AddInitialMetadata("cura-plugin-version", metadata.plugin_version); // optional but recommended
 
-                cura::plugins::slots::simplify::v0::SimplifyServiceModifyRequest request;
-                grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse> writer{ &server_context };
-                co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
-                cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse response;
+                cura::plugins::slots::handshake::v0::CallRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::slots::handshake::v0::CallResponse> writer{ &server_context };
+                co_await agrpc::request(&cura::plugins::slots::handshake::v0::HandshakeService::AsyncService::RequestCall, handshake_service, server_context, request, writer, boost::asio::use_awaitable);
+                cura::plugins::slots::handshake::v0::CallResponse response;
+                response.set_plugin_name(metadata.plugin_name);
+                response.set_plugin_version(metadata.plugin_version);
+                response.set_slot_version(metadata.slot_version);
+                response.set_plugin_version(metadata.plugin_version);
+                co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
+            }
+        },
+        boost::asio::detached);
+
+    // Start the plugin modify process
+    boost::asio::co_spawn(
+        grpc_context,
+        [&]() -> boost::asio::awaitable<void>
+        {
+            while (true)
+            {
+                grpc::ServerContext server_context;
+                server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version); // IMPORTANT: This NEEDS to be set!
+                server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
+                server_context.AddInitialMetadata("cura-plugin-version", metadata.plugin_version); // optional but recommended
+
+                cura::plugins::slots::simplify::v0::CallRequest request;
+                grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v0::CallResponse> writer{ &server_context };
+                co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyModifyService::AsyncService::RequestCall, service, server_context, request, writer, boost::asio::use_awaitable);
+                cura::plugins::slots::simplify::v0::CallResponse response;
 
                 const auto& client_metadata = server_context.client_metadata();
                 for (const auto& pair : client_metadata)

@@ -61,13 +61,13 @@ int main(int argc, const char** argv)
             while (true)
             {
                 grpc::ServerContext server_context;
-                server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version); // IMPORTANT: This NEEDS to be set!
-                server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
-                server_context.AddInitialMetadata("cura-plugin-version", metadata.plugin_version); // optional but recommended
 
                 cura::plugins::slots::handshake::v0::CallRequest request;
                 grpc::ServerAsyncResponseWriter<cura::plugins::slots::handshake::v0::CallResponse> writer{ &server_context };
                 co_await agrpc::request(&cura::plugins::slots::handshake::v0::HandshakeService::AsyncService::RequestCall, handshake_service, server_context, request, writer, boost::asio::use_awaitable);
+                spdlog::info("Received handshake request");
+                spdlog::info("Slot ID: {}, version_range: {}", static_cast<int>(request.slot_id()), request.version_range());
+
                 cura::plugins::slots::handshake::v0::CallResponse response;
                 response.set_plugin_name(metadata.plugin_name);
                 response.set_plugin_version(metadata.plugin_version);
@@ -86,10 +86,6 @@ int main(int argc, const char** argv)
             while (true)
             {
                 grpc::ServerContext server_context;
-                server_context.AddInitialMetadata("cura-slot-version", metadata.slot_version); // IMPORTANT: This NEEDS to be set!
-                server_context.AddInitialMetadata("cura-plugin-name", metadata.plugin_name); // optional but recommended
-                server_context.AddInitialMetadata("cura-plugin-version", metadata.plugin_version); // optional but recommended
-
                 cura::plugins::slots::simplify::v0::CallRequest request;
                 grpc::ServerAsyncResponseWriter<cura::plugins::slots::simplify::v0::CallResponse> writer{ &server_context };
                 co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyModifyService::AsyncService::RequestCall, service, server_context, request, writer, boost::asio::use_awaitable);

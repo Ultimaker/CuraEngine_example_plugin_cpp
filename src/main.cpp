@@ -10,6 +10,7 @@
 #include <docopt/docopt.h> // Library for parsing command line arguments
 #include <fmt/format.h> // Formatting library
 #include <fmt/ranges.h> // Formatting library for ranges
+#include <google/protobuf/empty.pb.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <spdlog/spdlog.h> // Logging library
@@ -17,6 +18,8 @@
 #include "plugin/cmdline.h" // Custom command line argument definitions
 #include "simplify/simplify.h" // Custom utilities for simplifying code
 
+#include "cura/plugins/slots/broadcast/v0/broadcast.grpc.pb.h"
+#include "cura/plugins/slots/broadcast/v0/broadcast.pb.h"
 #include "cura/plugins/slots/handshake/v0/handshake.grpc.pb.h"
 #include "cura/plugins/slots/handshake/v0/handshake.pb.h"
 #include "cura/plugins/slots/simplify/v0/simplify.grpc.pb.h"
@@ -48,6 +51,9 @@ int main(int argc, const char** argv)
     cura::plugins::slots::handshake::v0::HandshakeService::AsyncService handshake_service;
     builder.RegisterService(&handshake_service);
 
+    cura::plugins::slots::broadcast::v0::BroadcastService::AsyncService broadcast_service;
+    builder.RegisterService(&broadcast_service);
+
     cura::plugins::slots::simplify::v0::SimplifyModifyService::AsyncService service;
     builder.RegisterService(&service);
 
@@ -73,10 +79,35 @@ int main(int argc, const char** argv)
                 response.set_plugin_version(metadata.plugin_version);
                 response.set_slot_version(metadata.slot_version);
                 response.set_plugin_version(metadata.plugin_version);
+                response.mutable_broadcast_subscriptions()->Add("BroadcastSettings");
+
                 co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
             }
         },
         boost::asio::detached);
+
+    // Listen to the Broadcast channel
+    std::unordered_map<std::string, std::string> settings;
+    boost::asio::co_spawn(grpc_context,
+                          [&]() -> boost::asio::awaitable<void>
+                          {
+                              while (true)
+                              {
+                                  grpc::ServerContext server_context;
+                                  cura::plugins::slots::broadcast::v0::BroadcastServiceSettingsRequest request;
+                                  grpc::ServerAsyncResponseWriter<google::protobuf::Empty> writer{ &server_context };
+                                  co_await agrpc::request(&cura::plugins::slots::broadcast::v0::BroadcastService::AsyncService::RequestBroadcastSettings, broadcast_service, server_context, request, writer, boost::asio::use_awaitable);
+                                  google::protobuf::Empty response{};
+                                  co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
+                                  for (const auto& [key, value] : request.global_settings().settings())
+                                  {
+                                      settings.emplace(key, value);
+                                      spdlog::info("Received setting: {} = {}", key, value);
+                                  }
+                              }
+                          },
+        boost::asio::detached);
+
 
     // Start the plugin modify process
     boost::asio::co_spawn(

@@ -87,7 +87,7 @@ int main(int argc, const char** argv)
         boost::asio::detached);
 
     // Listen to the Broadcast channel
-    std::unordered_map<std::string, std::string> settings;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> settings;
     boost::asio::co_spawn(grpc_context,
                           [&]() -> boost::asio::awaitable<void>
                           {
@@ -99,14 +99,29 @@ int main(int argc, const char** argv)
                                   co_await agrpc::request(&cura::plugins::slots::broadcast::v0::BroadcastService::AsyncService::RequestBroadcastSettings, broadcast_service, server_context, request, writer, boost::asio::use_awaitable);
                                   google::protobuf::Empty response{};
                                   co_await agrpc::finish(writer, response, grpc::Status::OK, boost::asio::use_awaitable);
+
+                                  auto c_uuid = server_context.client_metadata().find("cura-engine-uuid");
+                                  if (c_uuid == server_context.client_metadata().end()) {
+                                      spdlog::warn("cura-engine-uuid not found in client metadata");
+                                      continue;
+                                  }
+                                  std::string client_metadata = std::string { c_uuid->second.data(), c_uuid->second.size() };
+
+                                  // We create a new settings map for this uuid
+                                  std::unordered_map<std::string, std::string> uuid_settings;
+
+                                  // We insert all the settings from the request to the uuid_settings map
                                   for (const auto& [key, value] : request.global_settings().settings())
                                   {
-                                      settings.emplace(key, value);
+                                      uuid_settings.emplace(key, value);
                                       spdlog::info("Received setting: {} = {}", key, value);
                                   }
+
+                                  // We save the settings for this uuid in the global settings map
+                                  settings[client_metadata] = uuid_settings;
                               }
                           },
-        boost::asio::detached);
+             boost::asio::detached);
 
 
     // Start the plugin modify process
@@ -122,16 +137,19 @@ int main(int argc, const char** argv)
                 co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyModifyService::AsyncService::RequestCall, service, server_context, request, writer, boost::asio::use_awaitable);
                 cura::plugins::slots::simplify::v0::CallResponse response;
 
-                const auto& client_metadata = server_context.client_metadata();
-                for (const auto& pair : client_metadata)
-                {
-                    spdlog::info("Received metadata: {} = {}", std::string(pair.first.begin(), pair.first.end()), std::string(pair.second.begin(), pair.second.end()));
+                auto c_uuid = server_context.client_metadata().find("cura-engine-uuid");
+                if (c_uuid == server_context.client_metadata().end()) {
+                    spdlog::warn("cura-engine-uuid not found in client metadata");
+                    continue;
                 }
+                std::string client_metadata = std::string { c_uuid->second.data(), c_uuid->second.size() };
+                auto meshfix_maximum_resolution = static_cast<int>(std::stof(settings[client_metadata].at("meshfix_maximum_resolution")) * 1000);
+                spdlog::info("meshfix_maximum_resolution: {}", meshfix_maximum_resolution);
 
                 grpc::Status status = grpc::Status::OK;
                 try
                 {
-                    Simplify simpl(request.max_deviation(), request.max_resolution(), request.max_area_deviation());
+                    Simplify simpl(request.max_deviation(), meshfix_maximum_resolution, request.max_area_deviation());
                     auto* rsp_polygons = response.mutable_polygons()->add_polygons();
 
                     for (const auto& polygon : request.polygons().polygons())

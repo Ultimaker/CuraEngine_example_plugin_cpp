@@ -46,7 +46,7 @@ int main(int argc, const char** argv)
 
     grpc::ServerBuilder builder;
     agrpc::GrpcContext grpc_context{ builder.AddCompletionQueue() };
-    builder.AddListeningPort(fmt::format("{}:{}", args.at("<address>").asString(), args.at("<port>").asString()), grpc::InsecureServerCredentials());
+    builder.AddListeningPort(fmt::format("{}:{}", args.at("--address").asString(), args.at("--port").asString()), grpc::InsecureServerCredentials());
 
     cura::plugins::slots::handshake::v0::HandshakeService::AsyncService handshake_service;
     builder.RegisterService(&handshake_service);

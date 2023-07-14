@@ -155,7 +155,7 @@ int main(int argc, const char** argv)
                     for (const auto& polygon : request.polygons().polygons())
                     {
                         const auto& outline = polygon.outline();
-                        geometry::polygon outline_poly{};
+                        geometry::polygon_outer outline_poly{};
                         for (const auto& point : outline.path())
                         {
                             outline_poly.emplace_back(point.x(), point.y());
@@ -173,7 +173,7 @@ int main(int argc, const char** argv)
                         auto* rsp_holes = rsp_polygons->mutable_holes();
                         for (const auto& hole : polygon.holes())
                         {
-                            geometry::polygon holes_poly{};
+                            geometry::polygon_outer holes_poly{};
                             for (const auto& point : hole.path())
                             {
                                 holes_poly.emplace_back(point.x(), point.y());

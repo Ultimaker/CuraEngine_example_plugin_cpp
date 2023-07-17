@@ -64,6 +64,12 @@ int main(int argc, const char** argv)
                 co_await agrpc::request(&cura::plugins::slots::simplify::v0::SimplifyService::AsyncService::RequestModify, service, server_context, request, writer, boost::asio::use_awaitable);
                 cura::plugins::slots::simplify::v0::SimplifyServiceModifyResponse response;
 
+                const auto& client_metadata = server_context.client_metadata();
+                for (const auto& pair : client_metadata)
+                {
+                    spdlog::info("Received metadata: {} = {}", std::string(pair.first.begin(), pair.first.end()), std::string(pair.second.begin(), pair.second.end()));
+                }
+
                 grpc::Status status = grpc::Status::OK;
                 try
                 {

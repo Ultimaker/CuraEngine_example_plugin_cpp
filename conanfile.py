@@ -66,6 +66,7 @@ class CuraEngineSimplifyPluginConan(ConanFile):
         self.options["grpc"].php_plugin = False
         self.options["grpc"].python_plugin = False
         self.options["grpc"].ruby_plugin = False
+        self.options["asio-grpc"].local_allocator = "recycling_allocator"
 
     def layout(self):
         cmake_layout(self)
@@ -79,7 +80,7 @@ class CuraEngineSimplifyPluginConan(ConanFile):
         self.requires("docopt.cpp/0.6.3")
         self.requires("range-v3/0.12.0")
         self.requires("clipper/6.4.2")
-        self.requires("curaengine_grpc_definitions/latest@ultimaker/cura_10714")
+        self.requires("curaengine_grpc_definitions/latest@ultimaker/cura_10618")
 
     def validate(self):
         # validate the minimum cpp standard supported. For C++ projects only
@@ -106,7 +107,7 @@ class CuraEngineSimplifyPluginConan(ConanFile):
             tc.variables["USE_MSVC_RUNTIME_LIBRARY_DLL"] = not is_msvc_static_runtime(self)
         tc.cache_variables["CMAKE_POLICY_DEFAULT_CMP0077"] = "NEW"
         cpp_info = self.dependencies["curaengine_grpc_definitions"].cpp_info
-        tc.variables["GRPC_IMPORT_DIRS"] = cpp_info.resdirs[0]
+        tc.variables["GRPC_IMPORT_DIRS"] = cpp_info.resdirs[0].replace("\\", "/")
         tc.variables["GRPC_PROTOS"] = ";".join([str(p).replace("\\", "/") for p in Path(cpp_info.resdirs[0]).rglob("*.proto")])
         tc.generate()
 

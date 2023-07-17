@@ -26,14 +26,14 @@ using Point = ClipperLib::IntPoint;
  * @tparam Direction
  * @tparam Container
  */
-template<concepts::point P, bool IsClosed, direction Direction, template<class> class Container>
+template<concepts::point P, bool IsClosed, direction Direction, template<class, class = std::allocator<P>> class Container>
 requires concepts::point<typename Container<P>::value_type> struct point_container : public Container<P>
 {
     inline static constexpr bool is_closed = IsClosed;
     inline static constexpr direction winding = Direction;
 };
 
-template<concepts::point P = Point, template<class> class Container = std::vector>
+template<concepts::point P = Point, template<class, class = std::allocator<P>> class Container = std::vector>
 struct polyline : public point_container<P, false, direction::NA, Container>
 {
     constexpr polyline() noexcept = default;
@@ -42,7 +42,7 @@ struct polyline : public point_container<P, false, direction::NA, Container>
     }
 };
 
-template<concepts::point P, direction Direction, template<class> class Container>
+template<concepts::point P, direction Direction, template<class, class = std::allocator<P>> class Container>
 struct polygon : public point_container<P, true, Direction, Container>
 {
     constexpr polygon() noexcept = default;
@@ -51,10 +51,10 @@ struct polygon : public point_container<P, true, Direction, Container>
     }
 };
 
-template<concepts::point P = Point, template<class> class Container = std::vector>
+template<concepts::point P = Point, template<class, class = std::allocator<P>> class Container = std::vector>
 polygon(std::initializer_list<P>)->polygon<P, direction::NA, Container>;
 
-template<concepts::point P = Point, template<class> class Container = std::vector>
+template<concepts::point P = Point, template<class, class = std::allocator<P>> class Container = std::vector>
 struct polygon_outer : public point_container<P, true, direction::CW, Container>
 {
     constexpr polygon_outer() noexcept = default;
@@ -63,7 +63,7 @@ struct polygon_outer : public point_container<P, true, direction::CW, Container>
     }
 };
 
-template<concepts::point P = Point, template<class> class Container = std::vector>
+template<concepts::point P = Point, template<class, class = std::allocator<P>> class Container = std::vector>
 struct polygon_inner : public point_container<P, true, direction::CCW, Container>
 {
     constexpr polygon_inner() noexcept = default;
@@ -72,7 +72,7 @@ struct polygon_inner : public point_container<P, true, direction::CCW, Container
     }
 };
 
-template<concepts::point P = Point, template<class> class Container = std::vector>
+template<concepts::point P = Point, template<class, class = std::allocator<P>> class Container = std::vector>
 requires concepts::point<typename Container<P>::value_type> struct polygons : public Container<polygon<P, direction::NA, Container>*>
 {
     constexpr polygons() noexcept = default;

@@ -66,6 +66,7 @@ class CuraEngineSimplifyPluginConan(ConanFile):
         self.options["grpc"].php_plugin = False
         self.options["grpc"].python_plugin = False
         self.options["grpc"].ruby_plugin = False
+        self.options["asio-grpc"].local_allocator = "recycling_allocator"
 
     def layout(self):
         cmake_layout(self)

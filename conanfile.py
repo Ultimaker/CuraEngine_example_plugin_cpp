@@ -40,7 +40,7 @@ class CuraEngineSimplifyPluginConan(ConanFile):
         return {
             "gcc": "11",
             "clang": "14",
-            "apple-clang": "14",
+            "apple-clang": "13",
             "msvc": "192",
             "visual_studio": "17",
         }
